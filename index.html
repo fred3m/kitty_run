@@ -1,0 +1,216 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <title>Making your first Phaser 3 Game - Part 10</title>
+    <script src="//cdn.jsdelivr.net/npm/phaser@3.11.0/dist/phaser.js"></script>
+    <style type="text/css">
+        body {
+            margin: 0;
+        }
+    </style>
+</head>
+<body>
+
+<script type="text/javascript">
+
+var config = {
+    type: Phaser.AUTO,
+    width: 800,
+    height: 600,
+    physics: {
+        default: 'arcade',
+        arcade: {
+            gravity: { y: 500 },
+            debug: false
+        }
+    },
+    scene: {
+        preload: preload,
+        create: create,
+        update: update
+    }
+};
+
+var player;
+var pumpkins;
+var ghosts;
+var platforms;
+var cursors;
+var score = 0;
+var gameOver = false;
+var scoreText;
+
+var game = new Phaser.Game(config);
+
+function preload ()
+{
+    this.load.image('sky', 'assets/sky.png');
+    this.load.image('ground', 'assets/platform.png');
+    this.load.spritesheet('pumpkin', 'assets/pumpkin.png', { frameWidth: 32, frameHeight: 32 });
+    this.load.spritesheet('cat-run', 'assets/RunCatb.png', { frameWidth: 32, frameHeight: 32 });
+    this.load.spritesheet('cat-idle', 'assets/IdleCatb.png', { frameWidth: 32, frameHeight: 32 });
+    this.load.spritesheet('ghost', 'assets/BonusCuteGhostIdle-sheet.png', { frameWidth: 32, frameHeight: 32 });
+}
+
+function create ()
+{
+    //  A simple background for our game
+    this.add.image(400, 300, 'sky');
+
+    //  The platforms group contains the ground and the 2 ledges we can jump on
+    platforms = this.physics.add.staticGroup();
+
+    //  Here we create the ground.
+    //  Scale it to fit the width of the game (the original sprite is 400x32 in size)
+    platforms.create(400, 568, 'ground').setScale(2).refreshBody();
+
+    // The player and its settings
+    player = this.physics.add.sprite(100, 450, 'cat-run');
+
+    //  Player physics properties. Give the little guy a slight bounce.
+    player.setBounce(0.2);
+    player.setCollideWorldBounds(true);
+
+    //  Our player animations, turning, walking left and walking right.
+    this.anims.create({
+        key: 'run',
+        frames: this.anims.generateFrameNumbers('cat-run', { frames: [0,1,2,3,4,5,6,5,4,3,2,1] }),
+        frameRate: 20,
+        repeat: -1
+    });
+
+    this.anims.create({
+        key: 'idle',
+        frames: [ { key: 'cat-idle', start: 0, end: 6 } ],
+        frameRate: 20
+    });
+
+    this.anims.create({
+        key: 'pumpkin-glow',
+        frames: this.anims.generateFrameNumbers('pumpkin', { start: 0, end: 16 }),
+        frameRate: 8,
+        repeat: -1  // -1 = loop forever
+    });
+
+    this.anims.create({
+        key: 'ghost-idle',
+        frames: this.anims.generateFrameNumbers('ghost', { start: 0, end: 6 }),
+        frameRate: 20
+    });
+
+    //  Input Events
+    cursors = this.input.keyboard.createCursorKeys();
+
+    //  Some pumpkins to collect, 12 in total, evenly spaced 70 pixels apart along the x axis
+    pumpkins = this.physics.add.group({
+        key: 'pumpkin',
+        repeat: 11,
+        setXY: { x: 12, y: 0, stepX: 70 }
+    });
+
+    pumpkins.children.iterate(function (child) {
+        //  Give each pumpkin a slightly different bounce
+        child.setBounceY(Phaser.Math.FloatBetween(0.4, 0.8));
+
+    });
+
+    pumpkins.children.iterate(function (pumpkin) {
+        pumpkin.play('pumpkin-glow');
+        pumpkin.anims.setTimeScale(1 + Math.random() * 0.5);
+    });
+
+    ghosts = this.physics.add.group();
+
+    //  The score
+    scoreText = this.add.text(16, 16, 'score: 0', { fontSize: '32px', fill: '#000' });
+
+    //  Collide the player and the pumpkins with the platforms
+    this.physics.add.collider(player, platforms);
+    this.physics.add.collider(pumpkins, platforms);
+    this.physics.add.collider(ghosts, platforms);
+
+    //  Checks to see if the player overlaps with any of the pumpkins, if he does call the collectPumpkin function
+    this.physics.add.overlap(player, pumpkins, collectPumpkin, null, this);
+
+    this.physics.add.collider(player, ghosts, hitGhost, null, this);
+}
+
+function update ()
+{
+    if (gameOver)
+    {
+        return;
+    }
+
+    if (cursors.left.isDown)
+    {
+        player.setVelocityX(-160);
+
+        player.anims.play('run', true);
+        player.flipX = true;
+    }
+    else if (cursors.right.isDown)
+    {
+        player.setVelocityX(160);
+
+        player.anims.play('run', true);
+        player.flipX = false;
+    }
+    else
+    {
+        player.setVelocityX(0);
+
+        player.anims.play('idle');
+    }
+
+    if (cursors.up.isDown && player.body.touching.down)
+    {
+        player.setVelocityY(-250);
+    }
+}
+
+function collectPumpkin (player, pumpkin)
+{
+    pumpkin.disableBody(true, true);
+
+    //  Add and update the score
+    score += 10;
+    scoreText.setText('Score: ' + score);
+
+    if (pumpkins.countActive(true) === 0)
+    {
+        //  A new batch of pumpkins to collect
+        pumpkins.children.iterate(function (child) {
+
+            child.enableBody(true, child.x, 0, true, true);
+
+        });
+
+        var x = (player.x < 400) ? Phaser.Math.Between(400, 800) : Phaser.Math.Between(0, 400);
+
+        var ghost = ghosts.create(x, 16, 'ghost');
+        ghost.setBounce(1);
+        ghost.setCollideWorldBounds(true);
+        ghost.setVelocity(Phaser.Math.Between(-200, 200), 20);
+        ghost.anims.play('ghost-idle');
+        ghost.allowGravity = false;
+
+    }
+}
+
+function hitGhost (player, ghost)
+{
+    this.physics.pause();
+
+    player.setTint(0xff0000);
+
+    player.anims.play('idle');
+
+    gameOver = true;
+}
+
+</script>
+
+</body>
+</html>
