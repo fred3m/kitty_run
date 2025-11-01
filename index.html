@@ -7,10 +7,88 @@
     <style type="text/css">
         body {
             margin: 0;
+            padding: 0;
+            font-family: Arial, sans-serif;
+            background-color: #1a1a2e;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        canvas {
+            border: 2px solid #ff6600;
+            border-radius: 10px;
+            box-shadow: 0 0 20px rgba(255, 102, 0, 0.3);
+        }
+
+        #gameModal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.8);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+
+        .modal-content {
+            background-color: #ff6600;
+            padding: 40px;
+            border-radius: 15px;
+            text-align: center;
+            border: 3px solid #ff3300;
+            box-shadow: 0 0 20px rgba(255, 102, 0, 0.5);
+        }
+
+        .modal-content h2 {
+            color: white;
+            margin: 0 0 20px 0;
+            font-size: 2.5em;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+        }
+
+        .modal-content p {
+            color: white;
+            margin: 0 0 30px 0;
+            font-size: 1.2em;
+        }
+
+        #startButton {
+            background-color: #ff3300;
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            font-size: 1.5em;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+            font-weight: bold;
+            text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.5);
+        }
+
+        #startButton:hover {
+            background-color: #cc2600;
+        }
+
+        .hidden {
+            display: none !important;
         }
     </style>
 </head>
 <body>
+
+<div id="gameModal">
+    <div class="modal-content">
+        <h2>🎃 Halloween Kitty! 🎃</h2>
+        <p>Help the kitty collect pumpkins and avoid ghosts!</p>
+        <p>Use UP ARROW or CLICK to jump</p>
+        <button id="startButton">Start Game</button>
+    </div>
+</div>
 
 <script type="text/javascript">
 
@@ -44,12 +122,85 @@ let gameOptions = {
     jumpForce: 400,
     playerStartPosition: 200,
     jumps: 2,
-    hitPoints: 5,
+    hitPoints: 1,
 }
 
 var score = 0;
+var gameStarted = false;
+var currentScene = null;
+var isRestarting = false;
 
 var game = new Phaser.Game(config);
+
+// Modal management
+function showModal(isGameOver = false) {
+    const modal = document.getElementById('gameModal');
+    const button = document.getElementById('startButton');
+    const title = modal.querySelector('h2');
+    const description = modal.querySelector('p');
+
+    if (isGameOver) {
+        title.textContent = '💀 Game Over! 💀';
+        description.textContent = `Final Score: ${score}`;
+        button.textContent = 'Play Again';
+    } else {
+        title.textContent = '🎃 Halloween Kitty! 🎃';
+        description.textContent = 'Help the kitty collect pumpkins and avoid ghosts!';
+        button.textContent = 'Start Game';
+    }
+
+    modal.classList.remove('hidden');
+}
+
+function hideModal() {
+    document.getElementById('gameModal').classList.add('hidden');
+}
+
+function startGame() {
+    if (currentScene) {
+        if (currentScene.gameOver) {
+            // Reset the game manually
+            score = 0;
+            currentScene.gameOver = false;
+            gameStarted = true;
+
+            // Reset player
+            currentScene.player.setTint(0xffffff); // Remove red tint
+            currentScene.player.setPosition(100, 500);
+            currentScene.player.anims.play('run', true);
+
+            // Reset health
+            currentScene.healthPoints = gameOptions.hitPoints;
+            currentScene.healthText.setText('Health: ' + currentScene.healthPoints);
+            currentScene.scoreText.setText('Score: ' + score);
+
+            // Clear all pumpkins and ghosts
+            currentScene.pumpkins.clear(true, true);
+            currentScene.ghosts.clear(true, true);
+
+            // Add initial pumpkins and ghosts
+            addPumpkin(currentScene, 700, 500);
+            addGhost(currentScene, 900, 500);
+
+            // Resume physics
+            currentScene.physics.resume();
+        } else {
+            // Resume the game
+            currentScene.physics.resume();
+            gameStarted = true;
+        }
+    } else {
+        // First time starting
+        gameStarted = true;
+    }
+    hideModal();
+}
+
+// Add event listener for the start button
+document.getElementById('startButton').addEventListener('click', startGame);
+
+// Show modal initially
+showModal();
 
 function preload ()
 {
@@ -64,6 +215,11 @@ function preload ()
 function create ()
 {
     this.gameOver = false;
+    currentScene = this;
+
+    // Reset game state variables when scene restarts
+    this.healthPoints = gameOptions.hitPoints;
+
     //  A simple background for our game
     this.add.image(400, 300, 'sky');
 
@@ -136,10 +292,9 @@ function create ()
     this.ghosts = this.physics.add.group();
 
     //  The score
-    this.scoreText = this.add.text(16, 16, 'score: 0', { fontSize: '32px', fill: '#000' });
+    this.scoreText = this.add.text(16, 16, 'Score: ' + score, { fontSize: '32px', fill: '#000' });
 
-    // Health points
-    this.healthPoints = gameOptions.hitPoints;
+    // Health points (already set in create function start)
     this.healthText = this.add.text(600, 16, 'Health: ' + this.healthPoints, { fontSize: '32px', fill: '#100' });
 
     //  Collide the player and the pumpkins with the platforms
@@ -154,6 +309,10 @@ function create ()
 
     addPumpkin(this, 700, 500);
     addGhost(this, 900, 500);
+
+    // Always pause the game initially - it will be resumed by startGame()
+    this.physics.pause();
+    gameStarted = false;
 }
 
 function addPumpkin(scene, x, y){
@@ -184,7 +343,7 @@ function addGhost(scene, x, y){
 
 function update (time, delta)
 {
-    if (this.gameOver) {
+    if (this.gameOver || !gameStarted) {
         return;
     }
     pointer = this.input.activePointer;
@@ -270,7 +429,13 @@ function hitGhost (player, ghost)
     } else {
         this.physics.pause();
         player.setTint(0xff0000);
-        gameOver = true;
+        this.gameOver = true;
+        gameStarted = false;
+
+        // Show game over modal after a brief delay
+        setTimeout(() => {
+            showModal(true);
+        }, 1000);
     }
 }
 
