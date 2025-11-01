@@ -43,7 +43,8 @@ let gameOptions = {
     playerGravity: 900,
     jumpForce: 400,
     playerStartPosition: 200,
-    jumps: 2
+    jumps: 2,
+    hitPoints: 5,
 }
 
 var score = 0;
@@ -56,6 +57,7 @@ function preload ()
     this.load.image('ground', 'assets/platform.png');
     this.load.spritesheet('pumpkin', 'assets/pumpkin.png', { frameWidth: 32, frameHeight: 32 });
     this.load.spritesheet('cat-run', 'assets/RunCatb.png', { frameWidth: 32, frameHeight: 32 });
+    this.load.spritesheet('cat-hurt', 'assets/HurtCatb.png', { frameWidth: 32, frameHeight: 32 });
     this.load.spritesheet('ghost', 'assets/BonusCuteGhostIdle-sheet.png', { frameWidth: 32, frameHeight: 32 });
 }
 
@@ -78,9 +80,13 @@ function create ()
     //  Player physics properties. Give the little guy a slight bounce.
     this.player.setBounce(0.2);
     this.player.setCollideWorldBounds(true);
+
+    // Shrink the player's collision box to make collisions more precise
+    this.player.body.setSize(20, 24, true); // width, height, center
     this.player.jumpVelocity = -150;       // initial jump speed
     this.player.maxJumpTime = 400;         // milliseconds allowed to keep rising
     this.player.jumpTimer = 0;             // track how long the key is held
+    this.player.isInAir = false;          // track if player is in air
 
     //  Input Events
     cursors = this.input.keyboard.createCursorKeys();
@@ -89,6 +95,18 @@ function create ()
     this.anims.create({
         key: 'run',
         frames: this.anims.generateFrameNumbers('cat-run', { frames: [0,1,2,3,4,5,6,5,4,3,2,1] }),
+        frameRate: 20,
+        repeat: -1
+    });
+    this.anims.create({
+        key: 'jump',
+        frames: this.anims.generateFrameNumbers('cat-run', { frames: [6] }),
+        frameRate: 20,
+        repeat: -1
+    });
+    this.anims.create({
+        key: 'hurt',
+        frames: this.anims.generateFrameNumbers('cat-hurt', { start: 0, end: 6 }),
         frameRate: 20,
         repeat: -1
     });
@@ -120,6 +138,10 @@ function create ()
     //  The score
     this.scoreText = this.add.text(16, 16, 'score: 0', { fontSize: '32px', fill: '#000' });
 
+    // Health points
+    this.healthPoints = gameOptions.hitPoints;
+    this.healthText = this.add.text(600, 16, 'Health: ' + this.healthPoints, { fontSize: '32px', fill: '#100' });
+
     //  Collide the player and the pumpkins with the platforms
     this.physics.add.collider(this.player, this.platforms);
     this.physics.add.collider(this.pumpkins, this.platforms);
@@ -128,10 +150,10 @@ function create ()
     //  Checks to see if the player overlaps with any of the pumpkins, if he does call the collectPumpkin function
     this.physics.add.overlap(this.player, this.pumpkins, collectPumpkin, null, this);
 
-    this.physics.add.collider(this.player, this.ghosts, hitGhost, null, this);
+    this.physics.add.overlap(this.player, this.ghosts, hitGhost, null, this);
 
     addPumpkin(this, 700, 500);
-    addGhost(this, 900, 450);
+    addGhost(this, 900, 500);
 }
 
 function addPumpkin(scene, x, y){
@@ -150,6 +172,11 @@ function addGhost(scene, x, y){
     ghost.setBounce(1);
     ghost.setCollideWorldBounds(false);
     ghost.play('ghost-idle'); // Start animation for new ghosts too
+    ghost.didHurt = false;
+
+    // Shrink the ghost's collision box to make collisions more precise
+    ghost.body.setSize(20, 24, true); // width, height, center
+
     scene.ghosts.add(ghost);
     ghost.setVelocityX(-gameOptions.scrollSpeed); // Set velocity AFTER it's in the group
     scene.nextGhostDistance = Phaser.Math.Between(gameOptions.ghostSpawnRange[0], gameOptions.ghostSpawnRange[1]);
@@ -174,9 +201,17 @@ function update (time, delta)
         // extend jump while key is held (slightly counter gravity)
         this.player.setVelocityY(this.player.jumpVelocity);
         this.player.jumpTimer += game.loop.delta;
+        this.player.anims.play('jump', true);
+        this.player.isInAir = true;
     } else if (this.player.isJumping && !jumping) {
         // stop extending the jump
         this.player.isJumping = false;
+    }
+
+    // Reset isInAir flag when player touches the ground
+    if (this.player.body.touching.down && this.player.isInAir) {
+        this.player.isInAir = false;
+        this.player.anims.play('run', true);
     }
 
     // Check if we need to add a new pumpkin
@@ -188,7 +223,7 @@ function update (time, delta)
     // Check if we need to add a new ghost
     let lastGhostX = this.ghosts.getChildren().length ? this.ghosts.getChildren()[this.ghosts.getChildren().length -1].x : 0;
     if(screenWidth - lastGhostX > this.nextGhostDistance){
-        addGhost(this, screenWidth + 50, 450);
+        addGhost(this, screenWidth + 50, 516);
     }
 
     // Check for any pumpkins that have gone off screen
@@ -220,13 +255,23 @@ function collectPumpkin (player, pumpkin)
 
 function hitGhost (player, ghost)
 {
-    this.physics.pause();
+    if(ghost.didHurt) {
+        return;
+    }
+    ghost.didHurt = true;
+    // Play hurt animation
+    player.anims.play('hurt');
+    player.setVelocityY(player.body.velocity.y - 100);
 
-    player.setTint(0xff0000);
-
-    player.anims.play('idle');
-
-    gameOver = true;
+    // Reduce health or end game
+    if (this.healthPoints > 1) {
+        this.healthPoints -= 1;
+        this.healthText.setText('Health: ' + this.healthPoints);
+    } else {
+        this.physics.pause();
+        player.setTint(0xff0000);
+        gameOver = true;
+    }
 }
 
 </script>
