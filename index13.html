@@ -120,6 +120,8 @@
                 currentScene.scoreText.setText('Score: ' + currentScene.score);
                 currentScene.gameOver = false;
                 currentScene.gameStarted = true;
+                currentScene.speed = 5;
+                currentScene.changedSpeed = false;
 
                 // Reset player
                 currentScene.player.setPosition(gameOptions.playerStartX, gameOptions.playerStartY);
@@ -162,7 +164,7 @@
 
     // global game options
     let gameOptions = {
-        scrollSpeed: 350,
+        scrollSpeed: 100,
         screenWidth: 800,
         screenHeight: 600,
         gravity: {y: 500},
@@ -172,8 +174,10 @@
         prizeRangeX: [200, 799],
         prizeRangeY: [475, 516],
         enemyRangeX: [200, 799],
-        enemyRangeY: [516, 516],
-        initialHealth: 3
+        enemyRangeY: [500, 516],
+        initialHealth: 3,
+        maxJumpTime: 200, // milliseconds
+        speedFactor: 50
     }
 
     // Phaser game configuration
@@ -211,6 +215,7 @@
     // Create the game world
     function create () {
         currentScene = this;
+        this.speed = 5;
         // Extract animations from the images we loaded
         createAnimations(this);
 
@@ -243,10 +248,36 @@
             this.player.setVelocityY(this.player.jumpVelocity);
             this.player.anims.play('jump', true);
             this.player.state = 'jumping';
-        } else if (this.player.body.touching.down) {
+            this.player.jumpTimer = 0;
+        } else if (this.player.body.touching.down && this.player.state == 'falling') {
             // landed
             this.player.anims.play('run', true);
             this.player.state = 'running';
+        }
+
+        if(cursors.left.isDown){
+            if (!this.changedSpeed){
+                this.speed = Math.max(this.speed - 1, 1);
+                changeSpeed(this);
+                this.changedSpeed = true;
+            }
+        } else if(cursors.right.isDown){
+            if (!this.changedSpeed){
+                this.speed = Math.min(this.speed + 1, 10);
+                changeSpeed(this);
+                this.changedSpeed = true;
+            }
+        } else {
+            this.changedSpeed = false;
+        }
+
+        if (this.player.state === 'jumping' && pressJump && this.player.jumpTimer < gameOptions.maxJumpTime) {
+            // extend jump while the key is held (slightly counter gravity)
+            this.player.setVelocityY(this.player.jumpVelocity);
+            this.player.jumpTimer += delta;
+        } else if (this.player.state === 'jumping') {
+            // stop extending jump
+            this.player.state = 'falling';
         }
 
         // Check if we need to add a new prize
@@ -307,6 +338,9 @@
         // keep track of the player's health
         scene.player.health = gameOptions.initialHealth;
         scene.healthText = scene.add.text(16, 48, 'Health: ' + scene.player.health, { fontSize: '32px', fill: '#000' });
+
+        // Keep track of the player's speed
+        scene.speedText = scene.add.text(16, 80, 'Speed: ' + scene.speed, { fontSize: '32px', fill: '#000' });
 
         // Add enemies to the game
         scene.enemies = scene.physics.add.group({
@@ -376,16 +410,30 @@
         // Randomize the animation speed a bit
         prize.anims.setTimeScale(1 + Math.random() * 0.5);
         // Set the prize to scroll left as the player runs
-        prize.setVelocityX(-gameOptions.scrollSpeed);
+        prize.setVelocityX(getSpeed(scene));
         // Randomize the distance to the next prize
         scene.nextPrizeDistance = Phaser.Math.Between(gameOptions.prizeRangeX[0], gameOptions.prizeRangeX[1]);
+    }
+
+    function getSpeed(scene){
+        return -gameOptions.scrollSpeed - scene.speed * gameOptions.speedFactor;
+    }
+
+    function changeSpeed(scene){
+        scene.prizes.getChildren().forEach(prize => {
+            prize.setVelocityX(getSpeed(scene));
+        });
+        scene.enemies.getChildren().forEach(enemy => {
+            enemy.setVelocityX(getSpeed(scene));
+        });
+        scene.speedText.setText('Speed: ' + scene.speed);
     }
 
     function collectPrize(player, prize) {
         prize.destroy();
 
         // Update the score
-        this.score += 10;
+        this.score += this.speed;
         this.scoreText.setText('Score: ' + this.score);
     }
 
@@ -404,7 +452,7 @@
         // Randomize the animation speed a bit
         enemy.anims.setTimeScale(1 + Math.random() * 0.5);
         // Set the enemy to scroll left as the player runs
-        enemy.setVelocityX(-gameOptions.scrollSpeed);
+        enemy.setVelocityX(getSpeed(scene));
         // Randomize the distance to the next enemy
         scene.nextEnemyDistance = Phaser.Math.Between(gameOptions.enemyRangeX[0], gameOptions.enemyRangeX[1]);
         // Keep track if the enemy has already hurt the player
@@ -423,6 +471,7 @@
             // Decrease health
             player.health -= 1;
             this.healthText.setText('Health: ' + player.health);
+            player.state = 'hit';
         } else {
             this.physics.pause();
             this.gameOver = true;
