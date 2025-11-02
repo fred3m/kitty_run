@@ -406,4 +406,57 @@ This part is surprisingly simple! First we'll create a new option in `gameOption
 ```javascript
 prize.setVelocityX(-gameOptions.scrollSpeed);
 ```
-##
+
+## Collecting prizes
+
+### Keeping score
+
+First we need to define the players score and add a text display to the screen. Add this to the end of your `createObjects` function
+
+```javascript
+scene.score = 0;
+scene.scoreText = scene.add.text(16, 16, 'Score: ' + scene.score, { fontSize: '32px', fill: '#000' });
+```
+
+Now we need to create a new function to tell the code what to do when a prize is collected
+
+```javascript
+function collectPrize(player, prize) {
+    prize.destroy();
+
+    // Update the score
+    this.score += 10;
+    this.scoreText.setText('Score: ' + this.score);
+}
+```
+
+Finally we need to add the following line to `setCollisions` to call the `collectPrize` function when the user overlaps with the prize
+
+```javscript
+scene.physics.add.overlap(scene.player, scene.prizes, collectPrize, null, scene);
+```
+
+Refresh your code and see that you can now score points for jumping and collecting a pumpkin!
+
+### Creating new pumpkins
+
+Let's start to randomly create pumpkins to make our game more interesting. First we'll a couple of new `gameOptions`
+
+```javascript
+prizeRangeX: [200, 799],
+prizeRangeY: [475, 516]
+```
+
+Now in `addPrize` we add `scene.nextPrizeDistance = Phaser.Math.Between(gameOptions.prizeRangeX[0], gameOptions.prizeRangeX[1]);` to define thhe distance between the newly created prize and the next prize.
+
+Finally in the `update` method we add a check to see if the player has traveled far enough to require a new prize to be created, and to create one if it has.
+
+```javascript
+let lastPrizeX = this.prizes.getChildren().length ? this.prizes.getChildren()[this.prizes.getChildren().length -1].x : 0;
+if(gameOptions.screenWidth - lastPrizeX > this.nextPrizeDistance){
+    let y = Phaser.Math.Between(gameOptions.prizeRangeY[0], gameOptions.prizeRangeY[1]);
+    addPrize(this, gameOptions.screenWidth + 50, y, 'pumpkin');
+}
+```
+
+Refresh your browser and see that you're now collecting pumpkins!
