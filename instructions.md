@@ -631,3 +631,192 @@ if(player.health > 1){
     this.physics.pause();
 }
 ```
+
+## Adding the start/restart button
+
+Anytime there is a menu or pop up that shows up on top of the screen we call that `modal`. There's nothing particularly interesting about this so I'll just give the code for wrapping this up. First we add some new styles to the `<style>` section of the header
+
+```css
+#gameModal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.8);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 1000;
+}
+
+.modal-content {
+    background-color: #ff6600;
+    padding: 40px;
+    border-radius: 15px;
+    text-align: center;
+    border: 3px solid #ff3300;
+    box-shadow: 0 0 20px rgba(255, 102, 0, 0.5);
+}
+
+.modal-content h2 {
+    color: white;
+    margin: 0 0 20px 0;
+    font-size: 2.5em;
+    text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+}
+
+.modal-content p {
+    color: white;
+    margin: 0 0 30px 0;
+    font-size: 1.2em;
+}
+
+#startButton {
+    background-color: #ff3300;
+    color: white;
+    border: none;
+    padding: 15px 30px;
+    font-size: 1.5em;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: background-color 0.3s;
+    font-weight: bold;
+    text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.5);
+}
+
+#startButton:hover {
+    background-color: #cc2600;
+}
+
+.hidden {
+    display: none !important;
+}
+```
+
+Next we add a new html component between the `<body>` and the `<script>`
+
+```html
+<div id="gameModal">
+    <div class="modal-content">
+        <h2>🎃 Halloween Kitty! 🎃</h2>
+        <p>Help the kitty collect pumpkins and avoid ghosts!</p>
+        <p>Use UP ARROW or CLICK to jump</p>
+        <button id="startButton">Start Game</button>
+    </div>
+</div>
+```
+
+Now in the `<script>` section we create a few new functions
+
+```javascript
+// Modal management
+function showModal(isGameOver = false) {
+    const modal = document.getElementById('gameModal');
+    const button = document.getElementById('startButton');
+    const title = modal.querySelector('h2');
+    const description = modal.querySelector('p');
+
+    if (isGameOver) {
+        title.textContent = '💀 Game Over! 💀';
+        button.textContent = 'Play Again';
+    } else {
+        title.textContent = '🎃 Halloween Kitty! 🎃';
+        description.textContent = 'Help the kitty collect pumpkins and avoid ghosts!';
+        button.textContent = 'Start Game';
+    }
+
+    modal.classList.remove('hidden');
+}
+
+function hideModal() {
+    document.getElementById('gameModal').classList.add('hidden');
+}
+
+function startGame() {
+    if(currentScene){
+        if(currentScene.gameOver){
+            // Reset the game mannually
+            currentScene.score = 0;
+            currentScene.scoreText.setText('Score: ' + currentScene.score);
+            currentScene.gameOver = false;
+            currentScene.gameStarted = true;
+
+            // Reset player
+            currentScene.player.setPosition(gameOptions.playerStartX, gameOptions.playerStartY);
+            currentScene.player.anims.play('run', true);
+
+            // Reset health
+            currentScene.player.health = gameOptions.initialHealth;
+            currentScene.healthText.setText('Health: ' + currentScene.player.health);
+
+            // Clear existing prizes and enemies
+            currentScene.prizes.clear(true, true);
+            currentScene.enemies.clear(true, true);
+
+            // Add initial prizes and enemies
+            addPrize(currentScene, 600, 475, 'pumpkin');
+            addEnemy(currentScene, 900, 516, 'ghost');
+
+            // Resume physics
+            currentScene.physics.resume();
+        } else {
+            // Resume the game
+            currentScene.physics.resume();
+            currentScene.gameStarted = true;
+        }
+    } else {
+        currentScene.gameStarted = true;
+    }
+
+    hideModal();
+}
+
+// Add event listener for the start button
+document.getElementById('startButton').addEventListener('click', startGame);
+
+// Show modal initially
+showModal();
+
+// Keep track of the current scene
+let currentScene = null;
+```
+
+In `create` add the following
+
+```javascript
+currentScene = this;
+this.physics.pause();
+this.gameStarted = false;
+this.gameOver = false;
+```
+
+and finally update `hitEnemy` to look like
+
+```javascript
+function hitEnemy(player, enemy) {
+    if(enemy.didHurt) return; // already hurt the player once
+    enemy.didHurt = true;
+    // Play the hurt animation
+    player.anims.play('hurt');
+    // Bump the player up so that they can see that they were hit
+    player.setVelocityY(player.body.velocity.y - 100);
+
+    if(player.health > 1){
+        // Decrease health
+        player.health -= 1;
+        this.healthText.setText('Health: ' + player.health);
+    } else {
+        this.physics.pause();
+        this.gameOver = true;
+        this.gameStarted = false;
+
+        // Show game over modal after a brief delay
+        setTimeout(() => {
+            showModal(true);
+        }, 1000);
+    }
+}
+```
+
+And that's it! refresh your browser and you can play the full game. Now you can experiment and do things like change the cat, the players, the colors, the health points, and even try some crazier things like adding more platforms or making it so that holding down the jump key will help your player jump even higher. Have fun!
