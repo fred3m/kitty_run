@@ -432,7 +432,7 @@ function collectPrize(player, prize) {
 
 Finally we need to add the following line to `setCollisions` to call the `collectPrize` function when the user overlaps with the prize
 
-```javscript
+```javascript
 scene.physics.add.overlap(scene.player, scene.prizes, collectPrize, null, scene);
 ```
 
@@ -460,3 +460,174 @@ if(gameOptions.screenWidth - lastPrizeX > this.nextPrizeDistance){
 ```
 
 Refresh your browser and see that you're now collecting pumpkins!
+
+## Add Enemies
+
+If all you did was collect pumpkins forever it wouldn't be much of a game, so let's add some enemies! We go through the same basic steps that we did to add the pumpkins.
+
+First we add the spritesheet
+
+```javascript
+this.load.spritesheet('ghost', 'assets/BonusCuteGhostIdle-sheet.png', { frameWidth: 32, frameHeight: 32 });
+```
+
+and the animations
+
+```javascript
+scene.anims.create({
+    key: 'ghost-animation',
+    frames: scene.anims.generateFrameNumbers('ghost', { start: 0, end: 6 }),
+    frameRate: 10,
+    repeat: -1
+});
+```
+
+Then we create a group
+
+```javascript
+scene.enemies = scene.physics.add.group({
+    allowGravity: false,
+    immovable: true
+});
+```
+
+and a function to add enemies to the group
+
+```javascript
+function addEnemy(scene, x, y, name){
+    // Add a enemy to the enemies group
+    let enemy = scene.physics.add.sprite(x, y, name);
+    enemy.setScale(1.5);
+    // Don't prevent the enemy from going out of the world bounds
+    enemy.setCollideWorldBounds(false);
+    // Add the enemy to the enemies group
+    scene.enemies.add(enemy);
+    // Play the enemy animation
+    enemy.play(name+'-animation');
+    // Randomize the animation speed a bit
+    enemy.anims.setTimeScale(1 + Math.random() * 0.5);
+    // Set the enemy to scroll left as the player runs
+    enemy.setVelocityX(-gameOptions.scrollSpeed);
+    // Randomize the distance to the next enemy
+    scene.nextEnemyDistance = Phaser.Math.Between(gameOptions.enemyRangeX[0], gameOptions.enemyRangeX[1]);
+}
+```
+
+We create new options for their range
+```javascript
+enemyRangeX: [200, 799],
+enemyRangeY: [516, 516]
+```
+
+Add a new enemy in `create`
+
+```javascript
+addEnemy(this, 900, 516, 'ghost');
+```
+
+and add code to create new enemies
+
+```javascript
+let lastEnemyX = this.enemies.getChildren().length ? this.enemies.getChildren()[this.enemies.getChildren().length -1].x : 0;
+if(gameOptions.screenWidth - lastEnemyX > this.nextEnemyDistance){
+    let y = Phaser.Math.Between(gameOptions.enemyRangeY[0], gameOptions.enemyRangeY[1]);
+    addEnemy(this, gameOptions.screenWidth + 50, y, 'ghost');
+}
+```
+
+Refresh your browser to see ghosts appear in your game.
+
+### Adding collisions with the ghosts
+
+We add collisions similar to the way that we did with the prizes but first let's load the player injured image
+
+```javascript
+this.load.spritesheet('cat-hurt', 'assets/HurtCatb.png', { frameWidth: 32, frameHeight: 32 });
+```
+
+and extract the animation
+```javascript
+scene.anims.create({
+    key: 'hurt',
+    frames: scene.anims.generateFrameNumbers('cat-hurt', { start: 0, end: 6 }),
+    frameRate: 20,
+    repeat: -1
+});
+```
+
+Now we can define the collision function
+
+```javascript
+function hitEnemy(player, enemy) {
+    // Play the hurt animation
+    player.anims.play('hurt');
+    // Bump the player up so that they can see that they were hit
+    player.setVelocityY(player.body.velocity.y - 100);
+}
+```
+
+and add the collision in `setCollisions`
+
+```javascript
+scene.physics.add.overlap(scene.player, scene.enemies, hitEnemy, null, scene);
+```
+
+Refresh the browser and run now, but intentially hit the first ghost.
+
+Woah, why did the player jump so high? The reason is because there were a lot of frames where the player overlapped with the ghost and it registerd a hit each time. To fix this we add a property to the enemy in `addEnemy`
+
+```javascript
+enemy.didHurt = false;
+```
+
+Now we can deactivate a ghost once it's been hit by adding these lines to `hitEnemy`
+
+```javascript
+if(enemy.didHurt) return; // already hurt the player once
+enemy.didHurt = true;
+```
+
+Now refresh and see that a ghost only registers a single hit.
+
+### Shrinking the collision box
+
+If you try to play the game for a bit you'll notice that the ghost is much smaller than its collision box and it's nearly impossible not to hit one. To fix this we need to shrink the bounding box by adding this to `addEnemy`
+
+```javascript
+enemy.body.setSize(20, 24, true); // width, height, center
+```
+
+You can optionally add a line to make the bounding box of the player a bit smaller too
+```javascript
+scene.player.body.setSize(28, 20, true); // width, height, center
+```
+
+Test it out now by refreshing your browser
+
+### Adding Health points
+
+Similar to keeping track of our score we can also keep track of our health. First we'll add an entry to `gameOption` to define out initial health
+
+```javascript
+initialHealth: 3
+```
+
+Now in `createObjects` we add the health bar
+
+```javascript
+scene.player.health = gameOptions.initialHealth;
+scene.healthText = scene.add.text(16, 48, 'Health: ' + scene.player.health, { fontSize: '32px', fill: '#000' });
+```
+
+
+Finally we add the code to subtract off health points if there is a collision
+
+```javascript
+if(player.health > 1){
+    // Decrease health
+    player.health -= 1;
+    this.healthText.setText('Health: ' + player.health);
+} else {
+    this.physics.pause();
+}
+```

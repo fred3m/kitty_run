@@ -35,7 +35,10 @@
         playerStartY: 516,
         jumpVelocity: -200,
         prizeRangeX: [200, 799],
-        prizeRangeY: [475, 516]
+        prizeRangeY: [475, 516],
+        enemyRangeX: [200, 799],
+        enemyRangeY: [516, 516],
+        initialHealth: 3
     }
 
     // Phaser game configuration
@@ -65,7 +68,9 @@
         this.load.image('sky', 'assets/sky.png');
         this.load.image('ground', 'assets/platform.png');
         this.load.spritesheet('cat-run', 'assets/RunCatb.png', { frameWidth: 32, frameHeight: 32 });
+        this.load.spritesheet('cat-hurt', 'assets/HurtCatb.png', { frameWidth: 32, frameHeight: 32 });
         this.load.spritesheet('pumpkin', 'assets/pumpkin.png', { frameWidth: 32, frameHeight: 32 });
+        this.load.spritesheet('ghost', 'assets/BonusCuteGhostIdle-sheet.png', { frameWidth: 32, frameHeight: 32 });
     }
 
     // Create the game world
@@ -84,6 +89,7 @@
 
         // Add a prize for the player to collect
         addPrize(this, 600, 475, 'pumpkin');
+        addEnemy(this, 900, 516, 'ghost');
     }
 
     // Update the game state
@@ -108,6 +114,13 @@
             let y = Phaser.Math.Between(gameOptions.prizeRangeY[0], gameOptions.prizeRangeY[1]);
             addPrize(this, gameOptions.screenWidth + 50, y, 'pumpkin');
         }
+
+        // Check if we need to add a new enemy
+        let lastEnemyX = this.enemies.getChildren().length ? this.enemies.getChildren()[this.enemies.getChildren().length -1].x : 0;
+        if(gameOptions.screenWidth - lastEnemyX > this.nextEnemyDistance){
+            let y = Phaser.Math.Between(gameOptions.enemyRangeY[0], gameOptions.enemyRangeY[1]);
+            addEnemy(this, gameOptions.screenWidth + 50, y, 'ghost');
+        }
     }
 
     // Create game objects
@@ -130,6 +143,9 @@
             'cat-run'
         );
 
+        // Shrink the player's collision box to make collisions more precise
+        scene.player.body.setSize(28, 20, true); // width, height, center
+
         // Start the player running
         scene.player.anims.play('run', true);
 
@@ -146,13 +162,25 @@
         // Keep track of the player's score
         scene.score = 0;
         scene.scoreText = scene.add.text(16, 16, 'Score: ' + scene.score, { fontSize: '32px', fill: '#000' });
+
+        // keep track of the player's health
+        scene.player.health = gameOptions.initialHealth;
+        scene.healthText = scene.add.text(16, 48, 'Health: ' + scene.player.health, { fontSize: '32px', fill: '#000' });
+
+        // Add enemies to the game
+        scene.enemies = scene.physics.add.group({
+            allowGravity: false,
+            immovable: true
+        });
     }
 
     // Set up collisions
     function setCollisions(scene){
         scene.physics.add.collider(scene.player, scene.platforms);
-        //  Checks to see if the player overlaps with any of the pumpkins, if he does call the collectPumpkin function
+        //  Checks to see if the player overlaps with any of the prizes, if he does call the collectPumpkin function
         scene.physics.add.overlap(scene.player, scene.prizes, collectPrize, null, scene);
+        //  Checks to see if the player overlaps with any of the enemies, if he does call the hitEnemy function
+        scene.physics.add.overlap(scene.player, scene.enemies, hitEnemy, null, scene);
     }
 
     // Create animations
@@ -171,11 +199,26 @@
             repeat: -1
         });
 
+        scene.anims.create({
+            key: 'hurt',
+            frames: scene.anims.generateFrameNumbers('cat-hurt', { start: 0, end: 6 }),
+            frameRate: 20,
+            repeat: -1
+        });
+
         // Pumpkin animations to make them glow
         scene.anims.create({
             key: 'pumpkin-animation',
             frames: scene.anims.generateFrameNumbers('pumpkin', { start: 0, end: 16 }),
             frameRate: 8,
+            repeat: -1
+        });
+
+        // Ghost animations to make them float
+        scene.anims.create({
+            key: 'ghost-animation',
+            frames: scene.anims.generateFrameNumbers('ghost', { start: 0, end: 6 }),
+            frameRate: 5,
             repeat: -1
         });
     }
@@ -203,6 +246,45 @@
         // Update the score
         this.score += 10;
         this.scoreText.setText('Score: ' + this.score);
+    }
+
+    function addEnemy(scene, x, y, name){
+        // Add a enemy to the enemies group
+        let enemy = scene.physics.add.sprite(x, y, name);
+        enemy.setScale(1.5);
+        // Don't prevent the enemy from going out of the world bounds
+        enemy.setCollideWorldBounds(false);
+        // Shrink the enemy's collision box to make collisions more precise
+        enemy.body.setSize(20, 24, true); // width, height, center
+        // Add the enemy to the enemies group
+        scene.enemies.add(enemy);
+        // Play the enemy animation
+        enemy.play(name+'-animation');
+        // Randomize the animation speed a bit
+        enemy.anims.setTimeScale(1 + Math.random() * 0.5);
+        // Set the enemy to scroll left as the player runs
+        enemy.setVelocityX(-gameOptions.scrollSpeed);
+        // Randomize the distance to the next enemy
+        scene.nextEnemyDistance = Phaser.Math.Between(gameOptions.enemyRangeX[0], gameOptions.enemyRangeX[1]);
+        // Keep track if the enemy has already hurt the player
+        enemy.didHurt = false;
+    }
+
+    function hitEnemy(player, enemy) {
+        if(enemy.didHurt) return; // already hurt the player once
+        enemy.didHurt = true;
+        // Play the hurt animation
+        player.anims.play('hurt');
+        // Bump the player up so that they can see that they were hit
+        player.setVelocityY(player.body.velocity.y - 100);
+
+        if(player.health > 1){
+            // Decrease health
+            player.health -= 1;
+            this.healthText.setText('Health: ' + player.health);
+        } else {
+            this.physics.pause();
+        }
     }
 </script>
 </body>
