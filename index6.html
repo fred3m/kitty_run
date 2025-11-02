@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <title>Halloween Kitty! 🎃 </title>
+    <script src="//cdn.jsdelivr.net/npm/phaser@3.11.0/dist/phaser.js"></script>
+    <style type="text/css">
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: Arial, sans-serif;
+            background-color: #1a1a2e;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        canvas {
+            border: 2px solid #ff6600;
+            border-radius: 10px;
+            box-shadow: 0 0 20px rgba(255, 102, 0, 0.3);
+        }
+    </style>
+</head>
+<body>
+<script type="text/javascript">
+    // global game options
+    let gameOptions = {
+        screenWidth: 800,
+        screenHeight: 600,
+        gravity: {y: 500},
+        playerStartX: 100,
+        playerStartY: 516,
+    }
+
+    // Phaser game configuration
+    let config = {
+        type: Phaser.AUTO,
+        width: gameOptions.screenWidth,
+        height: gameOptions.screenHeight,
+        physics: {
+            default: 'arcade',
+            arcade: {
+                gravity: gameOptions.gravity,
+                debug: false
+            }
+        },
+        scene: {
+            preload: preload,
+            create: create,
+            update: update
+        }
+    };
+
+    // create the Phaser game instance
+    let game = new Phaser.Game(config);
+
+    // Load all assets before the game starts
+    function preload () {
+        this.load.image('sky', 'assets/sky.png');
+        this.load.image('ground', 'assets/platform.png');
+        this.load.spritesheet('cat-run', 'assets/RunCatb.png', { frameWidth: 32, frameHeight: 32 });
+    }
+
+    // Create the game world
+    function create () {
+        // Extract animations from the images we loaded
+        createAnimations(this);
+
+        // Create game objects
+        createObjects(this);
+
+        // Set collisions between the player and the platforms
+        setCollisions(this);
+    }
+
+    // Update the game state
+    function update (time, delta) {
+    }
+
+    // Create game objects
+    function createObjects(scene){
+        scene.add.image(400, 300, 'sky');
+
+        // The platforms group contains the ground.
+        // If we want to add more ground pieces later we
+        // can use this same group
+        scene.platforms = scene.physics.add.staticGroup();
+
+        //  Here we create the ground.
+        //  Scale it to fit the width of the game (the original sprite is 400x32 in size)
+        scene.platforms.create(400, 568, 'ground').setScale(2).refreshBody();
+
+        // Create the player at the starting position
+        scene.player = scene.physics.add.sprite(
+            gameOptions.playerStartX,
+            gameOptions.playerStartY,
+            'cat-run'
+        );
+
+        // Start the player running
+        scene.player.anims.play('run', true);
+    }
+
+    // Set up collisions
+    function setCollisions(scene){
+        scene.physics.add.collider(scene.player, scene.platforms);
+    }
+
+    // Create animations
+    function createAnimations(scene) {
+        scene.anims.create({
+            key: 'run',
+            frames: scene.anims.generateFrameNumbers('cat-run', { frames: [0,1,2,3,4,5,6,5,4,3,2,1] }),
+            frameRate: 40,
+            repeat: -1
+        });
+    }
+</script>
+</body>
+</html>

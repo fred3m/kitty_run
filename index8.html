@@ -1,0 +1,185 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <title>Halloween Kitty! 🎃 </title>
+    <script src="//cdn.jsdelivr.net/npm/phaser@3.11.0/dist/phaser.js"></script>
+    <style type="text/css">
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: Arial, sans-serif;
+            background-color: #1a1a2e;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        canvas {
+            border: 2px solid #ff6600;
+            border-radius: 10px;
+            box-shadow: 0 0 20px rgba(255, 102, 0, 0.3);
+        }
+    </style>
+</head>
+<body>
+<script type="text/javascript">
+    // global game options
+    let gameOptions = {
+        screenWidth: 800,
+        screenHeight: 600,
+        gravity: {y: 500},
+        playerStartX: 100,
+        playerStartY: 516,
+        jumpVelocity: -200,
+        prize: {
+            image: 'pumpkin',
+            animation: 'pumpkin-glow'
+        },
+    }
+
+    // Phaser game configuration
+    let config = {
+        type: Phaser.AUTO,
+        width: gameOptions.screenWidth,
+        height: gameOptions.screenHeight,
+        physics: {
+            default: 'arcade',
+            arcade: {
+                gravity: gameOptions.gravity,
+                debug: false
+            }
+        },
+        scene: {
+            preload: preload,
+            create: create,
+            update: update
+        }
+    };
+
+    // create the Phaser game instance
+    let game = new Phaser.Game(config);
+
+    // Load all assets before the game starts
+    function preload () {
+        this.load.image('sky', 'assets/sky.png');
+        this.load.image('ground', 'assets/platform.png');
+        this.load.spritesheet('cat-run', 'assets/RunCatb.png', { frameWidth: 32, frameHeight: 32 });
+        this.load.spritesheet('pumpkin', 'assets/pumpkin.png', { frameWidth: 32, frameHeight: 32 });
+    }
+
+    // Create the game world
+    function create () {
+        // Extract animations from the images we loaded
+        createAnimations(this);
+
+        // Create game objects
+        createObjects(this);
+
+        // Set collisions between the player and the platforms
+        setCollisions(this);
+
+        //  Input Events
+        cursors = this.input.keyboard.createCursorKeys();
+
+        // Add a prize for the player to collect
+        addPrize(this, 600, 450);
+    }
+
+    // Update the game state
+    function update (time, delta) {
+        let pointer = this.input.activePointer;                // The mouse or touch pad
+        let pressJump = pointer.isDown || cursors.up.isDown;     // Is the player trying to jump?
+
+        if (pressJump && this.player.body.touching.down) {
+            // start jump
+            this.player.setVelocityY(this.player.jumpVelocity);
+            this.player.anims.play('jump', true);
+            this.player.state = 'jumping';
+        } else if (this.player.body.touching.down) {
+            // landed
+            this.player.anims.play('run', true);
+            this.player.state = 'running';
+        }
+    }
+
+    // Create game objects
+    function createObjects(scene){
+        scene.add.image(400, 300, 'sky');
+
+        // The platforms group contains the ground.
+        // If we want to add more ground pieces later we
+        // can use this same group
+        scene.platforms = scene.physics.add.staticGroup();
+
+        //  Here we create the ground.
+        //  Scale it to fit the width of the game (the original sprite is 400x32 in size)
+        scene.platforms.create(400, 568, 'ground').setScale(2).refreshBody();
+
+        // Create the player at the starting position
+        scene.player = scene.physics.add.sprite(
+            gameOptions.playerStartX,
+            gameOptions.playerStartY,
+            'cat-run'
+        );
+
+        // Start the player running
+        scene.player.anims.play('run', true);
+
+        // Player jump properties
+        scene.player.jumpVelocity = gameOptions.jumpVelocity;  // initial jump speed
+        scene.player.state = 'running';  // is the player currently running
+
+        // prizes group with all active prizes.
+        scene.prizes = scene.physics.add.group({
+            allowGravity: false,
+            immovable: true
+        });
+    }
+
+    // Set up collisions
+    function setCollisions(scene){
+        scene.physics.add.collider(scene.player, scene.platforms);
+    }
+
+    // Create animations
+    function createAnimations(scene) {
+        scene.anims.create({
+            key: 'run',
+            frames: scene.anims.generateFrameNumbers('cat-run', { frames: [0,1,2,3,4,5,6,5,4,3,2,1] }),
+            frameRate: 40,
+            repeat: -1 // -1 = loop forever
+        });
+
+        scene.anims.create({
+            key: 'jump',
+            frames: scene.anims.generateFrameNumbers('cat-run', { frames: [6] }),
+            frameRate: 20,
+            repeat: -1
+        });
+
+        // Pumpkin animations to make them glow
+        scene.anims.create({
+            key: 'pumpkin-glow',
+            frames: scene.anims.generateFrameNumbers('pumpkin', { start: 0, end: 16 }),
+            frameRate: 8,
+            repeat: -1
+        });
+    }
+
+    function addPrize(scene, x, y){
+        // Add a prize to the prizes group
+        let prize = scene.physics.add.sprite(x, y, gameOptions.prize.image);
+        // Don't prevent the prize from going out of the world bounds
+        prize.setCollideWorldBounds(false);
+        // Add the prize to the prizes group
+        scene.prizes.add(prize);
+        // Play the prize animation
+        prize.play(gameOptions.prize.animation);
+        // Randomize the animation speed a bit
+        prize.anims.setTimeScale(1 + Math.random() * 0.5);
+    }
+</script>
+</body>
+</html>
