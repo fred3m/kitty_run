@@ -367,7 +367,7 @@ Like the player (cat), the pumpkins are an animated sprite so we need to define 
 
 ```javascript
 scene.anims.create({
-    key: 'pumpkin-glow',
+    key: 'pumpkin-animation',
     frames: scene.anims.generateFrameNumbers('pumpkin', { start: 0, end: 16 }),
     frameRate: 8,
     repeat: -1
@@ -377,15 +377,15 @@ scene.anims.create({
 To create new prizes we add a new `addPrize` function that adds a prize at a given `x, y` position
 
 ```javascript
-function addPrize(scene, x, y){
+function addPrize(scene, x, y, name){
     // Add a prize to the prizes group
-    let prize = scene.physics.add.sprite(x, y, gameOptions.prize.image);
+    let prize = scene.physics.add.sprite(x, y, name);
     // Don't prevent the prize from going out of the world bounds
     prize.setCollideWorldBounds(false);
     // Add the prize to the prizes group
     scene.prizes.add(prize);
     // Play the prize animation
-    prize.play(gameOptions.prize.animation);
+    prize.play(name+'-animation');
     // Randomize the animation speed a bit
     prize.anims.setTimeScale(1 + Math.random() * 0.5);
 }
@@ -394,9 +394,16 @@ function addPrize(scene, x, y){
 Finally we add a single prize to the game in the `create` method with
 
 ```javascript
-addPrize(this, 600, 450);
+addPrize(this, 600, 475, 'pumpkin');
 ```
 
 Refresh your browser to see a floating pumpkin
 
 ## Making the scene scroll
+
+This part is surprisingly simple! First we'll create a new option in `gameOptions` for `scrollSpeed: 350`. Then we just add a line to the end of `addPrize` that will set the velocity of the prizes in the negative x-direction
+
+```javascript
+prize.setVelocityX(-gameOptions.scrollSpeed);
+```
+##

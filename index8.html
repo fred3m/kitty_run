@@ -33,10 +33,6 @@
         playerStartX: 100,
         playerStartY: 516,
         jumpVelocity: -200,
-        prize: {
-            image: 'pumpkin',
-            animation: 'pumpkin-glow'
-        },
     }
 
     // Phaser game configuration
@@ -84,7 +80,7 @@
         cursors = this.input.keyboard.createCursorKeys();
 
         // Add a prize for the player to collect
-        addPrize(this, 600, 450);
+        addPrize(this, 600, 450, 'pumpkin');
     }
 
     // Update the game state
@@ -161,22 +157,22 @@
 
         // Pumpkin animations to make them glow
         scene.anims.create({
-            key: 'pumpkin-glow',
+            key: 'pumpkin-animation',
             frames: scene.anims.generateFrameNumbers('pumpkin', { start: 0, end: 16 }),
             frameRate: 8,
             repeat: -1
         });
     }
 
-    function addPrize(scene, x, y){
+    function addPrize(scene, x, y, name){
         // Add a prize to the prizes group
-        let prize = scene.physics.add.sprite(x, y, gameOptions.prize.image);
+        let prize = scene.physics.add.sprite(x, y, name);
         // Don't prevent the prize from going out of the world bounds
         prize.setCollideWorldBounds(false);
         // Add the prize to the prizes group
         scene.prizes.add(prize);
         // Play the prize animation
-        prize.play(gameOptions.prize.animation);
+        prize.play(name+'-animation');
         // Randomize the animation speed a bit
         prize.anims.setTimeScale(1 + Math.random() * 0.5);
     }
